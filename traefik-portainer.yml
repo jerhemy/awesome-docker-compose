@@ -6,11 +6,10 @@ services:
     container_name: traefik
     restart: unless-stopped
     networks:
-      - traefik-proxy
+      - local-network
     ports:
       - "80:80"
       - "443:443"
-      - "8080:8080"
     environment:
       - "DO_AUTH_TOKEN=<key>"
     volumes:
@@ -24,23 +23,27 @@ services:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entryPoint.to=https"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
       - "--entrypoints.websecure.address=:443"
-      - "--certificatesresolvers.myresolver.acme.dnschallenge=true"
-      - "--certificatesresolvers.myresolver.acme.dnschallenge.provider=digitalocean"
-      - "--certificatesresolvers.myresolver.acme.email=postmaster@example.com"
-      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.dnschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.dnschallenge.provider=digitalocean"
+      - "--certificatesresolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53"
+      - "--certificatesresolvers.letsencrypt.acme.email=postmaster@example.com"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.traefik.entrypoints=http"
       - "traefik.http.routers.traefik.rule=Host(`traefik.hostname.com`)"
-      - "traefik.http.middlewares.traefik-auth.basicauth.users=username:password"
+      - "traefik.http.routers.traefik-secure.middlewares=traefik-auth"
+      - "traefik.http.middlewares.traefik-auth.basicauth.users=username:password" #htpasswd -u <username>
       - "traefik.http.middlewares.traefik-https-redirect.redirectscheme.scheme=https"
       - "traefik.http.routers.traefik.middlewares=traefik-https-redirect"
       - "traefik.http.routers.traefik-secure.entrypoints=https"
       - "traefik.http.routers.traefik-secure.rule=Host(`traefik.hostname.com`)"
-      - "traefik.http.routers.traefik-secure.middlewares=traefik-auth"
       - "traefik.http.routers.traefik-secure.tls=true"
-      - "traefik.http.routers.traefik-secure.tls.certresolver=http"
+      - "traefik.http.routers.traefik-secure.tls.certresolver=letsencrypt"
       - "traefik.http.routers.traefik-secure.service=api@internal"
 
   portainer:
@@ -48,7 +51,7 @@ services:
     container_name: portainer
     restart: unless-stopped
     networks:
-      - traefik-proxy
+      - local-network
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -68,5 +71,5 @@ services:
       - "traefik.docker.network=traefik-proxy"
 
 networks:
-  traefik-proxy:
+  local-network:
     external: true
